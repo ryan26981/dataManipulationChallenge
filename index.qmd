@@ -273,17 +273,34 @@ What's wrong with the `lateStatement` assignment and how would you fix it?
 
 ::: {.callout-tip}
 ## Your Answer: Data Types and Date Handling
-*Replace this with your answer to Question 1.*
+*The dtype of the actualShipDate series is datetime64[us]. I found this out by running print(shipments_df["actualShipDate"].dtype) in python. It is important that actualShipDate and plannedShipDate have the same data type for comparison because otherwise, the ‘>’ operator would not be valid (we cannot compare two variables of different types with ‘>’).
+*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: String vs Date Comparison
-*Replace this with your answer to Question 2.*
+*The result of that would be false because it would be comparaing the alphabetical value of the dates. We obviously don’t care about that. When we compare dates we compare them chronologically.
+Replace this with your answer to Question 2.*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: Debug This Code
-*Replace this with your answer to Question 3.*
+*Shipments_df[‘is_’late’] is a series of booleans, not a single boolean. I would fix it by making the if statement run row by row such as the following: 
+import numpy as np
+
+shipments_with_lateness = (
+    shipments_df
+    .assign(
+        is_late=lambda df: df['actualShipDate'] > df['plannedShipDate'],
+        days_late=lambda df: (df['actualShipDate'] - df['plannedShipDate']).dt.days,
+        lateStatement=lambda df: np.where(
+            df['is_late'],
+            "Darn Shipment is Late",
+            "Shipment is on Time"
+        )
+    )
+)
+*
 :::
 
 ### 2. Subset: Querying Rows and Filtering Columns
@@ -329,12 +346,19 @@ print(late_shipments.head())
 
 ::: {.callout-tip}
 ## Your Answer: Query vs Boolean Indexing
-*Replace this with your answer to Question 1.*
+*The difference is how its evaluated. The first one is evaluated as a string and panda does some fancy evaluating to make sense of the expression and the other is just normal python logic. The  main difference is readability. .query(‘is_late == True’) is more readable since it essentially reads like an english sentence. However, the boolean indexing is probably more robust.
+*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: Additional Row Querying
-*Replace this with your answer to Question 2.*
+*late_threshold = 5
+
+late_shipments = shipments_with_lateness[
+    shipments_with_lateness['days_late'] >= late_threshold
+]
+
+.*
 :::
 
 ### 3. Drop: Removing Unwanted Data
@@ -373,12 +397,14 @@ print("Remaining columns:", clean_shipments.columns.tolist())
 
 ::: {.callout-tip}
 ## Your Answer: Drop vs Filter Strategies
-*Replace this with your answer to Question 1.*
+*The difference between drop and filter is you would use drop when you have many useful columsn and just want to remove a few useless columns, whereas you  might use filter if you have lots of columns and only want to use a select few.
+*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: Handling Missing Data
-*Replace this with your answer to Question 2.*
+*This will remove any row that has a missing value in any column, even if the fields you care about are valid. You might want to be selective about which columns to check for missing values becaues you might lose a lot more data than intended.
+*
 :::
 
 ### 4. Sort: Arranging Data
@@ -417,12 +443,19 @@ print(sorted_by_lateness[['shipID', 'partID', 'days_late', 'is_late']].head(10))
 
 ::: {.callout-tip}
 ## Your Answer: Sorting Strategies
-*Replace this with your answer to Question 1.*
+*Ascending = false means you are going to be sorting the data largest to smallest and true means smallest to largest. You would sort multiple columns first by is late then by days late.
+sorted_df = clean_shipments.sort_values(
+    by=['is_late', 'days_late'],
+    ascending=[False, False]
+)
+
+*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: Index Management
-*Replace this with your answer to Question 2.*
+*We use this to reset the row indices so that the new row indices represent the order of the sorted data. The original index when you sort remains unchanged which could be problematic since iteration could become really confusing since the numbering still reflects the old order.
+*
 :::
 
 ### 5. Aggregate: Summarizing Data
@@ -463,8 +496,8 @@ print(f"\nOn-time delivery rate: {on_time_rate:.1f}%")
 
 ::: {.callout-tip}
 ## Your Answer: Boolean Aggregation
-*Replace this with your answer to Question 1.*
-:::
+*Replace this with your answer to Question 1.Sum() works because booleans behave like numbers (1s and 0s). This means that when you add a bunch of true and falses together, you count the number of “trues”. In this case, the number of late rows
+
 
 ### 6. Merge: Combining Information
 
@@ -503,12 +536,13 @@ print(shipments_with_category['prodCategory'].value_counts())
 
 ::: {.callout-tip}
 ## Your Answer: Join Types and Data Loss
-*Replace this with your answer to Question 1.*
+*Because we typically want to preserve our main dataset and add information from the lookup table. We can check if any shipments were lost in the merge by checking if there are any null rows in the right columns values.
+*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: Key Column Matching
-*Replace this with your answer to Question 2.*
+*The merge will be one-to-many and each shipment row for that part will get duplicated*
 :::
 
 ### 7. Split-Apply-Combine: Group Analysis
@@ -549,12 +583,14 @@ print(service_by_category)
 
 ::: {.callout-tip}
 ## Your Answer: GroupBy Mechanics
-*Replace this with your answer to Question 1.*
+*Groupby splits the data according to prodCategory. We need agg after the grouping becuase the groups are not meaningful to print out. Youd get a groupby object which isnt helpful. By using agg, you get a meaningful metric to go based off of.
+*
 :::
 
 ::: {.callout-tip}
 ## Your Answer: Multi-Level Grouping
-*Replace this with your answer to Question 2.*
+*If we do not include shippingID, the information we get is based off of individual items. This may be helpful if for some reason, certain items tend to be particularly late. However, grouping by shippingId means that we can look at ‘for each shipment, did this category in the order have any late items
+*
 :::
 
 ## Answering A Business Question
@@ -599,7 +635,13 @@ print(f"Percentage with multiple categories: {multi_category_shipments['shipID']
 
 ::: {.callout-tip}
 ## Your Answer: Business Question Analysis
-*Replace this with your answer to Question 1.*
+This code converts the data from a line-item level to a shipment-experience level. It answers the question:
+
+How often do customers place orders that include more than one product category, and when they do, does any category in the order arrive late?
+
+Instead of asking whether individual parts were late, the analysis focuses on the customer’s perspective:
+
+What does a customer actually experience when an order contains multiple types of products?*
 :::
 
 ## Student Analysis Section: Mastering Data Manipulation {#student-analysis-section}
